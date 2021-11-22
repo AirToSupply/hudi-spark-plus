@@ -14,11 +14,11 @@ The library currently supports the following versions of components：
 
 ## Features
 
-In addition to the basic features of data lake through Hudi(https://github.com/apache/hudi), it has the ability to consume upstream CDC change logs, and customize the sink connector to synchronize multiple tables of RDBMS into data lake. It greatly improves the development cost of streaming CDC change logs into warehousing.
+In addition to the basic features of data lake through Hudi (https://github.com/apache/hudi) , it has the ability to consume upstream CDC change logs, and customize the sink connector to synchronize multiple tables of RDBMS into data lake. It greatly improves the development cost of streaming CDC change logs into warehousing.
 
 ## How to do?
 
-We use Spark CDC scheme to obtain upstream change log records. We need to thank allwefantasy for providing it with a dependency library spark-binlog(https://github.com/allwefantasy/spark-binlog). 
+We use Spark CDC scheme to obtain upstream change log records. We need to thank allwefantasy for providing it with a dependency library spark-binlog (https://github.com/allwefantasy/spark-binlog) . 
 
 Unfortunately, the latest version of this dependency library is 1.0.4, and Spark 3.1.x is not supported. We have made a patch related to spark 3.1.x to recommend this work. This part of the code is not in the mavne public warehouse for the time being.
 
