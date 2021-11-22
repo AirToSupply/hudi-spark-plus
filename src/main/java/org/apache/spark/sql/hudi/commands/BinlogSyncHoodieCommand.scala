@@ -46,6 +46,8 @@ object BinlogSyncHoodieCommand extends Logging {
   private val _KEY_OPERATION_TYPE_ = "type"
   private val _KEY_OPERATION_TYPE_VAL_UPSERT_ = "upsert"
   private val _KEY_OPERATION_TYPE_VAL_DELETE_ = "delete"
+  private val _FIELD_VALUE = "value"
+  private val _FIELD_DATA_ = "data"
 
   private val _PLACEHOLDER_DATABASE_NAME = "{db}"
   private val _PLACEHOLDER_TABLE_NAME = "{table}"
@@ -173,13 +175,13 @@ object BinlogSyncHoodieCommand extends Logging {
       val sourceSchema = _deserializeSchema(meta.schema)
 
       // udf
-      val columnFromJsonStrUDF = new Column(JsonToStructs(sourceSchema, hoodieTableConfig, F.col("value").expr, None))
+      val columnFromJsonStrUDF = new Column(JsonToStructs(sourceSchema, hoodieTableConfig, F.col(_FIELD_VALUE).expr, None))
 
       // table DataFrame for batch
       val hoodieTableDataFrame = spark.createDataset[String](tempRDD)
-        .toDF("value")
-        .select(columnFromJsonStrUDF.as("data"))
-        .select("data.*")
+        .toDF(_FIELD_VALUE)
+        .select(columnFromJsonStrUDF.as(_FIELD_DATA_))
+        .select(s"${_FIELD_DATA_}.*")
 
       // sink hoodie
       hoodieTableDataFrame.write.format("hudi").options(hoodieTableConfig).mode(Append).save(hoodieTablePath)
