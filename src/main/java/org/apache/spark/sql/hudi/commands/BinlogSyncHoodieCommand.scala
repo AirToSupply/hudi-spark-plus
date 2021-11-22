@@ -100,7 +100,7 @@ object BinlogSyncHoodieCommand extends Logging {
       return
     }
 
-    import spark.implicits._
+    import spark.implicits._ 
 
     // multi table foreach
     metadate.foreach { meta =>
