@@ -73,6 +73,6 @@ query.awaitTermination()
 
 （1）For the configuration and usage of spark binlog, please refer to: https://github.com/allwefantasy/spark-binlog/blob/master/README.md .
 
-（2）Binloghoudiedatasource supports multi table synchronization into data lake, and the attribute behavior of each table is different, which requires users to configure different attributes of each data Lake table before it can be correctly consumed in real time.
+（2）BinlogHoudieDataSource supports multi table synchronization into data lake, and the attribute behavior of each table is different, which requires users to configure different attributes of each data Lake table before it can be correctly consumed in real time.
 
 （3）For Hudi related configuration, please refer to the official website of Hudi. Because there are many Hudi configuration items, these complex configuration items can be found in the Hudi spark datasource module of Hudi project, so users should abide by the following rules when specifying these parameters: ${db_name}.${table_name}.${hoodie_config_key} .
