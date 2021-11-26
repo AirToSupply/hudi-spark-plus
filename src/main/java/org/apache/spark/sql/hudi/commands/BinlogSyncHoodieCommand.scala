@@ -52,6 +52,9 @@ object BinlogSyncHoodieCommand extends Logging {
   private val _PLACEHOLDER_DATABASE_NAME = "{db}"
   private val _PLACEHOLDER_TABLE_NAME = "{table}"
 
+  private val _SPARK_CONF_TIMESTAMPFORMAT = "timestampFormat"
+  private val _SPARK_CONF_TIMESTAMPFORMAT_VAL = "yyyy-MM-dd'T'HH:mm:ss'['.SSS']['XXX']'"
+
   def convertStreamDataFrame(_data: Dataset[_]) = {
     if (_data.isStreaming) {
       class ConvertStreamDataFrame[T](encoder: ExpressionEncoder[T]) {
@@ -149,7 +152,7 @@ object BinlogSyncHoodieCommand extends Logging {
       })
       hoodieTableConfig = hoodieTableConfig.updated(HoodieWriteConfig.BASE_PATH.key(), hoodieTablePath)
 
-      // rewrite hoodie table config
+      // popluate hoodie table config
       hoodieTableConfig = hoodieTableConfig.updated(HoodieWriteConfig.UPSERT_PARALLELISM_VALUE.key(),
         hoodieTableConfig.getOrElse(HoodieWriteConfig.UPSERT_PARALLELISM_VALUE.key(),
           options.getOrElse(CONFIG_SINK_SHUFFLE_PARALLELISM, CONFIG_SINK_SHUFFLE_PARALLELISM_VAL)))
@@ -163,13 +166,16 @@ object BinlogSyncHoodieCommand extends Logging {
         hoodieTableConfig.getOrElse(HoodieWriteConfig.BULKINSERT_PARALLELISM_VALUE.key(),
           options.getOrElse(CONFIG_SINK_SHUFFLE_PARALLELISM, CONFIG_SINK_SHUFFLE_PARALLELISM_VAL)))
 
-      /**
-       * Determine whether to trigger the hoodie table delete operation according to the delete event of binlog
-       */
+      // Determine whether to trigger the hoodie table delete operation according to the delete event of binlog
       if (_KEY_OPERATION_TYPE_VAL_DELETE_.equalsIgnoreCase(operate)) {
         logInfo(s"table [${meta.db}.${meta.table}] is ready for deletion!")
         hoodieTableConfig = hoodieTableConfig.updated(
           DataSourceWriteOptions.OPERATION.key(), DataSourceWriteOptions.DELETE_OPERATION_OPT_VAL)
+      }
+
+      // popluate spark sql config
+      if (!hoodieTableConfig.contains(_SPARK_CONF_TIMESTAMPFORMAT)) {
+        hoodieTableConfig = hoodieTableConfig.updated(_SPARK_CONF_TIMESTAMPFORMAT, _SPARK_CONF_TIMESTAMPFORMAT_VAL)
       }
 
       val sourceSchema = _deserializeSchema(meta.schema)
