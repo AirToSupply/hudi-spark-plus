@@ -3,6 +3,7 @@ package org.apache.spark.sql.hudi.commands
 import com.alibaba.fastjson.parser.Feature
 import com.alibaba.fastjson.serializer.SerializerFeature
 import com.alibaba.fastjson.{JSON, JSONArray, JSONObject}
+import org.apache.commons.lang3.StringUtils
 import org.apache.hudi.DataSourceWriteOptions
 import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.exception.HoodieException
@@ -14,9 +15,10 @@ import org.apache.spark.sql.catalyst.expressions.JsonToStructs
 import org.apache.spark.sql.hudi.sources.BinlogHoodieDataSource
 import org.apache.spark.sql.SaveMode._
 import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{Column, Dataset, Row, SaveMode, SparkSession, functions => F}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SaveMode, SparkSession, functions => F}
 import tech.odes.common.util.Md5Util
 
+import java.util.UUID
 import scala.collection.JavaConverters._
 import scala.util.Try
 
@@ -37,6 +39,8 @@ object BinlogSyncHoodieCommand extends Logging {
 
   private val CONFIG_HOODIE_PATH = "option.hoodie.path"
 
+  private val CONFIG_HOODIE_TRANSFORMER_SQL = "hoodie.transformer.sql"
+
   private val _META_KEY_ = "__meta__"
   private val _KEY_DATABASE_NAME_ = "databaseName"
   private val _KEY_TABLE_NAME_ = "tableName"
@@ -54,6 +58,9 @@ object BinlogSyncHoodieCommand extends Logging {
 
   private val _SPARK_CONF_TIMESTAMPFORMAT = "timestampFormat"
   private val _SPARK_CONF_TIMESTAMPFORMAT_VAL = "yyyy-MM-dd'T'HH:mm:ss'['.SSS']['XXX']'"
+
+  private val _TRANSFORMER_SRC_PATTERN = "<SRC>";
+  private val _TRANSFORMER_TMP_TABLE = "HOODIE_SRC_TMP_TABLE_";
 
   def convertStreamDataFrame(_data: Dataset[_]) = {
     if (_data.isStreaming) {
@@ -93,6 +100,15 @@ object BinlogSyncHoodieCommand extends Logging {
     hoodieTableConfig.contains(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key()) &&
       hoodieTableConfig.contains(HoodieWriteConfig.PRECOMBINE_FIELD_NAME.key()) &&
       hoodieTableConfig.contains(HoodieWriteConfig.TBL_NAME.key())
+
+  def sqlQueryBasedTransformer(spark: SparkSession, hoodieTableDataFrame: DataFrame, query: String): DataFrame = {
+    // tmp table name doesn't like dashes
+    val tmpTable = _TRANSFORMER_TMP_TABLE.concat(UUID.randomUUID.toString.replace("-", "_"))
+    logInfo(s"Registering tmp table : ${tmpTable}")
+    hoodieTableDataFrame.registerTempTable(tmpTable)
+    val sqlQuery = query.replaceAll(_TRANSFORMER_SRC_PATTERN, tmpTable)
+    spark.sql(sqlQuery)
+  }
 
   def sink(spark: SparkSession,
            batch: RDD[JSONObject],
@@ -184,10 +200,17 @@ object BinlogSyncHoodieCommand extends Logging {
       val columnFromJsonStrUDF = new Column(JsonToStructs(sourceSchema, hoodieTableConfig, F.col(_FIELD_VALUE).expr, None))
 
       // table DataFrame for batch
-      val hoodieTableDataFrame = spark.createDataset[String](tempRDD)
+      var hoodieTableDataFrame = spark.createDataset[String](tempRDD)
         .toDF(_FIELD_VALUE)
         .select(columnFromJsonStrUDF.as(_FIELD_DATA_))
         .select(s"${_FIELD_DATA_}.*")
+
+      // transformer
+      hoodieTableConfig.get(CONFIG_HOODIE_TRANSFORMER_SQL) match {
+        case Some(query) if StringUtils.isNoneEmpty(query) =>
+          hoodieTableDataFrame = sqlQueryBasedTransformer(spark, hoodieTableDataFrame, query)
+        case _ =>
+      }
 
       // sink hoodie
       hoodieTableDataFrame.write.format("hudi").options(hoodieTableConfig).mode(Append).save(hoodieTablePath)
