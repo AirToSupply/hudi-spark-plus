@@ -157,7 +157,7 @@ object BinlogSyncHoodieCommand extends Logging {
       }
 
       // hoodie table path
-      val hoodieTablePath = options.getOrElse(HoodieWriteConfig.BASE_PATH.key(), {
+      val hoodieTablePath = hoodieTableConfig.getOrElse(HoodieWriteConfig.BASE_PATH.key(), {
         options.get(CONFIG_HOODIE_PATH) match {
           case Some(basePath) =>
             basePath.replace(_PLACEHOLDER_DATABASE_NAME, meta.db).replace(_PLACEHOLDER_TABLE_NAME, meta.table)
